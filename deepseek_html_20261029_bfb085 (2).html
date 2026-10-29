@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NEXTRON AI · HUD</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --hud-bg-dark: #000000;
+      --hud-panel-bg: rgba(6, 18, 30, 0.75);
+      --hud-border-cyan: #00e5ff;
+      --hud-text-main: #e0f7fa;
+      --hud-text-muted: #6b9db0;
+    }
+
+    body {
+      background: var(--hud-bg-dark);
+      color: var(--hud-text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background-image: 
+        linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .hud-container {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      grid-template-rows: 1fr auto;
+      gap: 20px;
+      padding: 24px;
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+    }
+
+    .panel {
+      background: var(--hud-panel-bg);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 229, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: 0.75rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--hud-border-cyan);
+      border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+      padding-bottom: 8px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-title::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--hud-border-cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--hud-border-cyan);
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--hud-text-muted);
+    }
+    .info-row span:last-child {
+      color: var(--hud-text-main);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #333;
+      transition: .4s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #888;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: rgba(0, 229, 255, 0.3);
+      border: 1px solid #00e5ff;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+      background-color: #00e5ff;
+      box-shadow: 0 0 8px #00e5ff;
+    }
+
+    .booster-panel {
+      margin-top: 10px;
+      padding: 12px;
+      background: rgba(255, 100, 0, 0.05);
+      border: 1px solid rgba(255, 100, 0, 0.3);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .booster-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #ff8800;
+      letter-spacing: 1px;
+    }
+    .heat-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    .heat-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #00e5ff;
+      transition: width 0.3s ease, background-color 0.3s ease;
+      box-shadow: 0 0 10px currentColor;
+    }
+    .heat-status {
+      font-size: 0.65rem;
+      text-align: right;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .center-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    .orb-canvas-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+    }
+
+    #orbCanvas {
+      width: 100%;
+      height: 100%;
+      max-width: 600px;
+      max-height: 600px;
+      display: block;
+      filter: drop-shadow(0 0 40px rgba(0, 229, 255, 0.2));
+      transition: filter 0.3s ease;
+    }
+
+    .right-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .results-area {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 4px;
+    }
+
+    .results-area::-webkit-scrollbar { width: 4px; }
+    .results-area::-webkit-scrollbar-track { background: transparent; }
+    .results-area::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.3); border-radius: 2px; }
+
+    .result-item {
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid rgba(0, 229, 255, 0.1);
+      border-left: 3px solid var(--hud-border-cyan);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--hud-text-main);
+      animation: fadeIn 0.4s ease;
+    }
+
+    .result-item strong {
+      display: block;
+      color: var(--hud-border-cyan);
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .empty-results {
+      color: var(--hud-text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 40px;
+      font-style: italic;
+    }
+
+    .bottom-bar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: center;
+      padding-bottom: 10px;
+    }
+
+    .search-wrapper {
+      width: 100%;
+      max-width: 800px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(6, 18, 30, 0.9);
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      border-radius: 50px;
+      padding: 16px 24px;
+      color: var(--hud-text-main);
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.1), inset 0 0 15px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--hud-border-cyan);
+      box-shadow: 0 0 30px rgba(0, 229, 255, 0.3), inset 0 0 20px rgba(0, 229, 255, 0.1);
+    }
+
+    .search-input::placeholder {
+      color: rgba(0, 229, 255, 0.4);
+      letter-spacing: 1px;
+    }
+
+    .overheat-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(50, 0, 0, 0.85);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      backdrop-filter: blur(5px);
+    }
+    .overheat-modal.show {
+      display: flex;
+      animation: flash 1s infinite alternate;
+    }
+    .overheat-box {
+      background: #000;
+      border: 2px solid #ff3300;
+      padding: 40px;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(255, 50, 0, 0.6);
+      max-width: 400px;
+    }
+    .overheat-box h2 {
+      color: #ff3300;
+      font-size: 1.8rem;
+      margin-bottom: 16px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(255, 50, 0, 0.8);
+    }
+    .overheat-box p {
+      color: #ddd;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .cool-down-btn {
+      background: #ff3300;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+      letter-spacing: 1px;
+    }
+    .cool-down-btn:hover { background: #ff5533; }
+    @keyframes flash {
+      from { background: rgba(50, 0, 0, 0.85); }
+      to { background: rgba(100, 0, 0, 0.95); }
+    }
+
+    @media (max-width: 1024px) {
+      .hud-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto auto;
+        padding: 16px;
+        overflow-y: auto;
+      }
+      .left-col { flex-direction: row; flex-wrap: wrap; }
+      .left-col .panel { flex: 1; min-width: 140px; }
+      .center-col { min-height: 300px; }
+      #orbCanvas { max-width: 300px; max-height: 300px; }
+      .right-col { max-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-grid"></div>
+
+  <div class="hud-container">
+    
+    <div class="left-col">
+      <div class="panel">
+        <div class="panel-title">System Time</div>
+        <div class="info-row"><span>Date</span><span id="sysDate">--</span></div>
+        <div class="info-row"><span>Time</span><span id="sysTime">--</span></div>
+        <div class="info-row"><span>Zone</span><span>IST</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">System Stats</div>
+        <div class="info-row">
+          <span>Core Status</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="coreToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="info-row"><span>Status</span><span id="coreStatusText" style="color:#00e5ff;">ONLINE</span></div>
+        <div class="info-row"><span>Memory</span><span id="sysMem">--</span></div>
+        <div class="info-row"><span>Latency</span><span id="sysLatency">--</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Location Info</div>
+        <div class="info-row"><span>Region</span><span>Local</span></div>
+        <div class="info-row"><span>Network</span><span>SECURE</span></div>
+        <div class="info-row"><span>Node</span><span id="sysNode">--</span></div>
+        
+        <div class="booster-panel">
+          <div class="booster-header">
+            <span>BOOSTER MODE</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="boosterToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="heat-bar-bg">
+            <div class="heat-bar-fill" id="heatBar"></div>
+          </div>
+          <div class="heat-status" id="heatStatus">CORE TEMP: NORMAL</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="center-col">
+      <div class="orb-canvas-wrap" id="orbClickArea">
+        <canvas id="orbCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="right-col">
+      <div class="panel" style="flex: 1; overflow: hidden;">
+        <div class="panel-title">AI Results</div>
+        <div class="results-area" id="resultsArea">
+          <div class="empty-results">Awaiting input...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="search-wrapper">
+        <input type="text" id="hudSearch" class="search-input" placeholder="Initialize query sequence..." autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+
+  </div>
+
+  <div class="overheat-modal" id="overheatModal">
+    <div class="overheat-box">
+      <h2 id="modalTitle">⚠️ CORE OVERHEATING</h2>
+      <p id="modalDesc">The AI Booster has reached critical temperature. System cooling is required before further queries can be processed.</p>
+      <button class="cool-down-btn" id="coolDownBtn">Initiate Cool Down</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // REPLACE THIS URL with your deployed backend URL
+      const API_URL = 'http://localhost:3000/api/chat';
+
+      function updateSystemTime() {
+        const now = new Date();
+        const optionsDate = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric' };
+        const optionsTime = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+        document.getElementById('sysDate').textContent = new Intl.DateTimeFormat('en-IN', optionsDate).format(now);
+        document.getElementById('sysTime').textContent = new Intl.DateTimeFormat('en-IN', optionsTime).format(now);
+      }
+      setInterval(updateSystemTime, 1000);
+      updateSystemTime();
+
+      const coreToggle = document.getElementById('coreToggle');
+      const coreStatusText = document.getElementById('coreStatusText');
+      coreToggle.addEventListener('change', () => {
+        if (coreToggle.checked) {
+          coreStatusText.textContent = 'ONLINE';
+          coreStatusText.style.color = '#00e5ff';
+        } else {
+          coreStatusText.textContent = 'OFFLINE';
+          coreStatusText.style.color = '#ff5555';
+        }
+      });
+
+      function updateSystemStats() {
+        let memValue;
+        if (performance.memory) {
+          const used = performance.memory.usedJSHeapSize / 1048576;
+          const limit = performance.memory.jsHeapSizeLimit / 1048576;
+          memValue = ((used / limit) * 100).toFixed(1) + '%';
+        } else {
+          memValue = (Math.random() * 20 + 40).toFixed(1) + '%';
+        }
+        const lat = Math.floor(Math.random() * 20 + 10);
+        const node = 'NX-' + Math.floor(Math.random() * 9000 + 1000);
+        
+        document.getElementById('sysMem').textContent = memValue;
+        document.getElementById('sysLatency').textContent = lat + 'ms';
+        document.getElementById('sysNode').textContent = node;
+      }
+      setInterval(updateSystemStats, 2000);
+      updateSystemStats();
+
+      let currentHeat = 0; 
+      let currentBattery = 100;
+      let isBoosterMode = false;
+      let isOverheated = false;
+      let isDead = false;
+      let showBatteryInside = false;
+
+      const heatBar = document.getElementById('heatBar');
+      const heatStatus = document.getElementById('heatStatus');
+      const overheatModal = document.getElementById('overheatModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalDesc = document.getElementById('modalDesc');
+      const coolDownBtn = document.getElementById('coolDownBtn');
+      const searchInput = document.getElementById('hudSearch');
+      const boosterToggle = document.getElementById('boosterToggle');
+      const orbClickArea = document.getElementById('orbClickArea');
+
+      boosterToggle.addEventListener('change', () => {
+        isBoosterMode = boosterToggle.checked;
+        if (!isBoosterMode) showBatteryInside = false;
+      });
+
+      orbClickArea.addEventListener('click', () => {
+        if (isBoosterMode && !isDead) {
+          showBatteryInside = !showBatteryInside;
+        }
+      });
+
+      function updateHeatUI() {
+        heatBar.style.width = currentHeat + '%';
+        
+        if (currentHeat < 40) {
+          heatBar.style.background = '#00e5ff';
+          heatBar.style.color = '#00e5ff';
+          heatStatus.textContent = `CORE TEMP: NORMAL | BATT: ${currentBattery.toFixed(1)}%`;
+          heatStatus.style.color = '#aaa';
+        } else if (currentHeat < 70) {
+          heatBar.style.background = '#ffdc00';
+          heatBar.style.color = '#ffdc00';
+          heatStatus.textContent = `CORE TEMP: WARM | BATT: ${currentBattery.toFixed(1)}%`;
+          heatStatus.style.color = '#ffdc00';
+        } else if (currentHeat < 95) {
+          heatBar.style.background = '#ff8800';
+          heatBar.style.color = '#ff8800';
+          heatStatus.textContent = `CORE TEMP: HOT | BATT: ${currentBattery.toFixed(1)}%`;
+          heatStatus.style.color = '#ff8800';
+        } else {
+          heatBar.style.background = '#ff3300';
+          heatBar.style.color = '#ff3300';
+          heatStatus.textContent = `CORE TEMP: CRITICAL | BATT: ${currentBattery.toFixed(1)}%`;
+          heatStatus.style.color = '#ff3300';
+        }
+      }
+
+      function addHeat(amount) {
+        if (isOverheated || isDead) return;
+        
+        const heatAmount = isBoosterMode ? amount * 2 : amount;
+        currentHeat = Math.min(100, currentHeat + heatAmount);
+        
+        const drainAmount = isBoosterMode ? 0.8 : 0.2;
+        currentBattery = Math.max(0, currentBattery - drainAmount);
+        
+        updateHeatUI();
+
+        if (currentBattery <= 1 && !isDead) {
+          triggerDeath();
+        } else if (currentHeat >= 100 && !isOverheated) {
+          triggerOverheat();
+        }
+      }
+
+      setInterval(() => {
+        if (currentHeat > 0 && !isOverheated && !isDead) {
+          currentHeat = Math.max(0, currentHeat - (isBoosterMode ? 3 : 1.5));
+          updateHeatUI();
+        }
+        if (currentBattery < 100 && !isDead && !isBoosterMode) {
+          currentBattery = Math.min(100, currentBattery + 0.05);
+          updateHeatUI();
+        }
+      }, 1000);
+
+      function triggerOverheat() {
+        isOverheated = true;
+        modalTitle.textContent = '⚠️ CORE OVERHEATING';
+        modalDesc.textContent = 'The AI Booster has reached critical temperature. System cooling is required before further queries can be processed.';
+        overheatModal.classList.add('show');
+        searchInput.disabled = true;
+        searchInput.placeholder = "SYSTEM OVERHEATED — COOLING REQUIRED";
+      }
+
+      function triggerDeath() {
+        isDead = true;
+        modalTitle.textContent = '🔋 BATTERY DEPLETED';
+        modalDesc.textContent = 'AI core battery has dropped below 1%. The system cannot function. Please recharge.';
+        overheatModal.classList.add('show');
+        searchInput.disabled = true;
+        searchInput.placeholder = "SYSTEM OFFLINE — BATTERY DEPLETED";
+      }
+
+      coolDownBtn.addEventListener('click', () => {
+        if (isDead) {
+          currentBattery = 100;
+          isDead = false;
+        }
+        isOverheated = false;
+        currentHeat = 0;
+        updateHeatUI();
+        overheatModal.classList.remove('show');
+        searchInput.disabled = false;
+        searchInput.placeholder = "Initialize query sequence...";
+      });
+
+      const canvas = document.getElementById('orbCanvas');
+      const ctx = canvas.getContext('2d');
+      let w, h, dpr;
+      let frame = 0;
+      let pulseScale = 1;
+      let targetPulse = 1;
+
+      function resizeCanvas() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = canvas.parentElement.getBoundingClientRect();
+        w = rect.width;
+        h = rect.height;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function drawOrb() {
+        frame++;
+        pulseScale += (targetPulse - pulseScale) * 0.1;
+        if (targetPulse > 1) targetPulse -= 0.005;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2;
+        const cy = h / 2;
+        const baseRadius = Math.min(w, h) * 0.28;
+        const radius = baseRadius * pulseScale;
+
+        const outerGlow = ctx.createRadialGradient(cx, cy, radius * 0.8, cx, cy, radius * 1.5);
+        outerGlow.addColorStop(0, 'rgba(0, 229, 255, 0.1)');
+        outerGlow.addColorStop(1, 'rgba(0, 229, 255, 0)');
+        ctx.fillStyle = outerGlow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(frame * 0.015);
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * (1.05 + i * 0.08), 0, Math.PI * 2);
+          ctx.strokeStyle = i % 2 === 0 ? 'rgba(192, 192, 192, 0.4)' : 'rgba(0, 150, 255, 0.4)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([10, 20, 5, 15]);
+          ctx.lineDashOffset = frame * (i % 2 === 0 ? 2 : -2);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.clip();
+
+        if (isBoosterMode) {
+          ctx.fillStyle = 'rgba(0, 10, 20, 0.9)';
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 5; i++) {
+            ctx.beginPath();
+            const startX = cx + Math.cos(frame * 0.02 + i) * radius * 0.8;
+            const startY = cy + Math.sin(frame * 0.02 + i) * radius * 0.8;
+            ctx.moveTo(startX, startY);
+            ctx.bezierCurveTo(
+              cx + (Math.random() - 0.5) * radius,
+              cy + (Math.random() - 0.5) * radius,
+              cx + (Math.random() - 0.5) * radius,
+              cy + (Math.random() - 0.5) * radius,
+              cx + Math.cos(frame * 0.02 + i + 1) * radius * 0.8,
+              cy + Math.sin(frame * 0.02 + i + 1) * radius * 0.8
+            );
+            ctx.stroke();
+          }
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.fillRect(cx - 15, cy - 10, 30, 20);
+          ctx.strokeStyle = '#00e5ff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(cx - 15, cy - 10, 30, 20);
+
+          if (showBatteryInside) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(frame * 0.05);
+            ctx.fillStyle = `rgba(0, 255, 100, ${currentBattery / 100 * 0.8})`;
+            ctx.beginPath();
+            ctx.roundRect(-10, -20, 20, 40, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#00ff64';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillRect(-4, -25, 8, 5);
+            ctx.restore();
+          }
+
+        } else {
+          const colors = [
+            { h: 320, s: 90, l: 70 },
+            { h: 220, s: 90, l: 70 },
+            { h: 270, s: 90, l: 70 }
+          ];
+
+          for (let i = 0; i < 3; i++) {
+            const c = colors[i];
+            const angle = frame * 0.01 * (i + 1);
+            const offsetX = Math.cos(angle) * radius * 0.4;
+            const offsetY = Math.sin(angle * 1.3) * radius * 0.4;
+            
+            const cloudGrad = ctx.createRadialGradient(
+              cx + offsetX, cy + offsetY, 0,
+              cx + offsetX, cy + offsetY, radius * 1.1
+            );
+            cloudGrad.addColorStop(0, `hsla(${c.h}, ${c.s}%, ${c.l}%, 0.7)`);
+            cloudGrad.addColorStop(1, `hsla(${c.h}, ${c.s}%, ${c.l}%, 0)`);
+            
+            ctx.fillStyle = cloudGrad;
+            ctx.beginPath();
+            ctx.arc(cx + offsetX, cy + offsetY, radius * 1.1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+
+        const glassGrad = ctx.createRadialGradient(
+          cx - radius * 0.3, cy - radius * 0.3, 0,
+          cx, cy, radius
+        );
+        glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        glassGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.05)');
+        glassGrad.addColorStop(0.8, 'rgba(0, 0, 0, 0.2)');
+        glassGrad.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = glassGrad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(cx - radius * 0.35, cy - radius * 0.35, radius * 0.12, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 15;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        const rimColor = currentHeat > 70 ? 'rgba(255, 50, 0, 0.8)' : 'rgba(0, 229, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.98, 0, Math.PI * 2);
+        ctx.strokeStyle = rimColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        requestAnimationFrame(drawOrb);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+      
+      setTimeout(() => {
+        resizeCanvas();
+        requestAnimationFrame(drawOrb);
+      }, 100);
+
+      const resultsArea = document.getElementById('resultsArea');
+
+      function addResult(query, answer) {
+        if (resultsArea.querySelector('.empty-results')) {
+          resultsArea.innerHTML = '';
+        }
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        const strong = document.createElement('strong');
+        strong.textContent = 'Q: ' + query;
+        const p = document.createElement('div');
+        p.textContent = answer;
+        div.appendChild(strong);
+        div.appendChild(p);
+        resultsArea.appendChild(div);
+        resultsArea.scrollTop = resultsArea.scrollHeight;
+      }
+
+      // UPDATED: Online API Call
+      async function processQuery(query) {
+        const clean = query.toLowerCase().trim();
+        if (!clean || isDead) return;
+
+        targetPulse = 1.15;
+        addHeat(10);
+
+        addResult(query, "Processing query via online AI...");
+
+        try {
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: query })
+          });
+          
+          if (!response.ok) throw new Error('Network response was not ok');
+          
+          const data = await response.json();
+          
+          // Remove the "Processing..." message and add the real result
+          const lastResult = resultsArea.lastElementChild;
+          if (lastResult) lastResult.remove();
+          
+          addResult(query, data.reply);
+          
+        } catch (error) {
+          const lastResult = resultsArea.lastElementChild;
+          if (lastResult) lastResult.remove();
+          
+          addResult(query, "Connection failed. Ensure the backend server is running and the API URL is correct.");
+        }
+      }
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !isOverheated && !isDead) {
+          const q = searchInput.value;
+          if (q.trim()) {
+            processQuery(q);
+            searchInput.value = '';
+          }
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>
